@@ -1,0 +1,72 @@
+name: build
+on:
+  push:
+    branches: [ '**' ]
+  pull_request:
+    branches: [ '**' ]
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-gnu
+            os: ubuntu-latest
+            cross: false
+            file-ext: ""
+          - target: x86_64-unknown-linux-musl
+            os: ubuntu-latest
+            cross: true
+            file-ext: ""
+          - target: x86_64-pc-windows-msvc
+            os: windows-latest
+            cross: false
+            file-ext: .exe
+          - target: x86_64-apple-darwin
+            os: macos-latest
+            cross: false
+            file-ext: ""
+          - target: aarch64-apple-darwin
+            os: macos-latest
+            cross: true
+            file-ext: ""
+          
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v2
+      
+      - name: install toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          target: ${{ matrix.target }}
+          override: true
+      
+      - name: build
+        uses: actions-rs/cargo@v1
+        with:
+          use-cross: ${{ matrix.cross }}
+          command: build
+          args: --release --target=${{ matrix.target }}
+      
+      - name: Compress binaries
+        continue-on-error: true
+        uses: svenstaro/upx-action@v2
+        with:
+          file: target/${{ matrix.target }}/release/cs${{ matrix.file-ext }}
+          args: -q --best --lzma
+          strip: false
+
+      - name: pack
+        run: |
+          mkdir -p release-${{ matrix.target }}
+          cd release-${{ matrix.target }}
+          tar -C ../target/${{ matrix.target }}/release -zcf cs-${{ matrix.target }}.tar.gz cs${{ matrix.file-ext }}
+          openssl dgst -sha256 -r cs-${{ matrix.target }}.tar.gz > cs-${{ matrix.target }}.sha256
+      
+      - name: Upload artifact
+        uses: actions/upload-artifact@v2
+        with:
+          name: ${{ matrix.target }}
+          path: release-${{ matrix.target }}/*
