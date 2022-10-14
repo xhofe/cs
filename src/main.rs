@@ -11,10 +11,9 @@ use std::{
 };
 use tui::{
     backend::{Backend, CrosstermBackend},
-    layout::{Constraint, Direction, Layout},
     style::{Color, Modifier, Style},
     text::Spans,
-    widgets::{Block, Borders, List, ListItem, ListState},
+    widgets::{Block, Borders, List, ListItem},
     Frame, Terminal,
 };
 
@@ -85,13 +84,14 @@ fn run_app<B: Backend>(
                     KeyCode::Enter => {
                         state.update(CsEvent::Right);
                         std::env::set_current_dir(state.get_current_dir())?;
-                        return Ok(());
+                        break;
                     }
                     _ => {}
                 }
             }
         }
     }
+    Ok(())
 }
 
 fn ui<B: Backend>(f: &mut Frame<B>, state: &mut State) {
