@@ -7,6 +7,7 @@ use cs::{Event as CsEvent, State};
 use std::{
     error::Error,
     io,
+    process::Command,
     time::{Duration, Instant},
 };
 use tui::{
@@ -34,8 +35,8 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     // create app and run it
     let tick_rate = Duration::from_millis(250);
-    let state = State::new();
-    let res = run_app(&mut terminal, state, tick_rate);
+    let mut state = State::new();
+    let res = run_app(&mut terminal, &mut state, tick_rate);
 
     // restore terminal
     disable_raw_mode()?;
@@ -44,23 +45,39 @@ fn main() -> Result<(), Box<dyn Error>> {
         LeaveAlternateScreen,
         DisableMouseCapture
     )?;
+    disable_raw_mode()?;
     terminal.show_cursor()?;
 
     if let Err(err) = res {
-        println!("{:?}", err)
+        println!("{:?}", err);
+        return Ok(());
     }
-
-    Ok(())
+    let output = if cfg!(target_os = "windows") {
+        Command::new("powershell")
+            // .args([
+            //     "/C",
+            //     format!("echo enter {}", state.get_current_dir().display()).as_str(),
+            // ])
+            .output()?
+    } else {
+        Command::new("bash")
+            // .arg("-c")
+            // .arg(format!("echo enter {}", state.get_current_dir().display()))
+            .output()?
+    };
+    std::process::exit(0);
+    // println!("{}", String::from_utf8_lossy(&output.stdout));
+    // Ok(())
 }
 
 fn run_app<B: Backend>(
     terminal: &mut Terminal<B>,
-    mut state: State,
+    state: &mut State,
     tick_rate: Duration,
 ) -> io::Result<()> {
     let mut last_tick = Instant::now();
     loop {
-        terminal.draw(|f| ui(f, &mut state))?;
+        terminal.draw(|f| ui(f, state))?;
 
         let timeout = tick_rate
             .checked_sub(last_tick.elapsed())
