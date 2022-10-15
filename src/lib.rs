@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use tui::widgets::ListState;
 
 pub enum Event {
-    Search(String),
+    Search,
     Sort(Option<Sort>),
     Up,
     Down,
@@ -21,12 +21,13 @@ pub enum Sort {
 
 pub struct State {
     dir: PathBuf,
-    search: String,
     selected: usize,
     files: Vec<PathBuf>,
     sort: Option<Sort>,
     reverse: bool,
     pub list: ListState,
+    pub search_mode: bool,
+    pub search: String,
 }
 
 impl State {
@@ -39,6 +40,7 @@ impl State {
             sort: None,
             reverse: false,
             list: ListState::default(),
+            search_mode: true,
         };
         state.update_files();
         state.list.select(Some(0));
@@ -69,7 +71,6 @@ impl State {
     }
     pub fn update(&mut self, event: Event) {
         match event {
-            Event::Search(search) => self.search = search,
             Event::Up => self.selected = (self.selected + self.files.len() - 1) % self.files.len(),
             Event::Down => self.selected = (self.selected + 1) % self.files.len(),
             Event::Left => {
@@ -92,8 +93,12 @@ impl State {
                     self.reverse = false;
                 }
             }
+            _ => {}
         }
         self.update_files();
+        if self.selected >= self.files.len() {
+            self.selected = self.files.len().max(1) - 1;
+        }
         self.list.select(Some(self.selected));
     }
 }
@@ -101,7 +106,7 @@ impl State {
 fn is_match(file: &PathBuf, search: &str) -> bool {
     file.file_name()
         .and_then(|name| name.to_str())
-        .map(|name| name.contains(search))
+        .map(|name| name.to_lowercase().contains(search.to_lowercase().as_str()))
         .unwrap_or(false)
 }
 

@@ -15,3 +15,4 @@ strip = true
 [dependencies]
 tui = "0.19"
 crossterm = "0.25"
+unicode-width = "0.1"
