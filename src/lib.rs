@@ -19,7 +19,7 @@ pub enum Sort {
     Ctime,
 }
 
-pub struct State {
+pub struct App {
     dir: PathBuf,
     selected: usize,
     files: Vec<PathBuf>,
@@ -30,7 +30,7 @@ pub struct State {
     pub search: String,
 }
 
-impl State {
+impl App {
     pub fn new() -> Self {
         let mut state = Self {
             dir: std::env::current_dir().unwrap(),
@@ -76,12 +76,14 @@ impl State {
             Event::Left => {
                 self.dir.pop();
                 self.selected = 0;
+                self.update_files();
             }
             Event::Right => {
                 if let Some(file) = self.files.get(self.selected) {
                     if file.is_dir() {
                         self.dir.push(file);
                         self.selected = 0;
+                        self.update_files();
                     }
                 }
             }
@@ -92,10 +94,12 @@ impl State {
                     self.sort = sort;
                     self.reverse = false;
                 }
+                self.update_files();
             }
-            _ => {}
+            Event::Search => {
+                self.update_files();
+            }
         }
-        self.update_files();
         if self.selected >= self.files.len() {
             self.selected = self.files.len().max(1) - 1;
         }

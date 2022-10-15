@@ -3,7 +3,7 @@ use crossterm::{
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
-use cs::{Event as CsEvent, State};
+use cs::{Event as CsEvent, App};
 use std::{
     error::Error,
     io,
@@ -38,8 +38,8 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     // create app and run it
     let tick_rate = Duration::from_millis(250);
-    let mut state = State::new();
-    let res = run_app(&mut terminal, &mut state, tick_rate);
+    let mut app = App::new();
+    let res = run_app(&mut terminal, &mut app, tick_rate);
 
     // restore terminal
     disable_raw_mode()?;
@@ -69,12 +69,12 @@ fn main() -> Result<(), Box<dyn Error>> {
 
 fn run_app<B: Backend>(
     terminal: &mut Terminal<B>,
-    state: &mut State,
+    app: &mut App,
     tick_rate: Duration,
 ) -> io::Result<()> {
     let last_tick = Instant::now();
     loop {
-        terminal.draw(|f| ui(f, state))?;
+        terminal.draw(|f| ui(f, app))?;
 
         let timeout = tick_rate
             .checked_sub(last_tick.elapsed())
@@ -84,29 +84,29 @@ fn run_app<B: Backend>(
                 match key.code {
                     KeyCode::Esc => return Ok(()),
                     KeyCode::Left => {
-                        state.update(CsEvent::Left);
+                        app.update(CsEvent::Left);
                     }
                     KeyCode::Down => {
-                        state.update(CsEvent::Down);
+                        app.update(CsEvent::Down);
                     }
                     KeyCode::Up => {
-                        state.update(CsEvent::Up);
+                        app.update(CsEvent::Up);
                     }
                     KeyCode::Right => {
-                        state.update(CsEvent::Right);
+                        app.update(CsEvent::Right);
                     }
                     KeyCode::Enter => {
-                        state.update(CsEvent::Right);
-                        std::env::set_current_dir(state.get_current_dir())?;
+                        app.update(CsEvent::Right);
+                        std::env::set_current_dir(app.get_current_dir())?;
                         break;
                     }
                     KeyCode::Char(c) => {
-                        state.search.push(c);
-                        state.update(CsEvent::Search);
+                        app.search.push(c);
+                        app.update(CsEvent::Search);
                     }
                     KeyCode::Backspace => {
-                        state.search.pop();
-                        state.update(CsEvent::Search);
+                        app.search.pop();
+                        app.update(CsEvent::Search);
                     }
                     _ => {}
                 }
@@ -116,7 +116,7 @@ fn run_app<B: Backend>(
     Ok(())
 }
 
-fn ui<B: Backend>(f: &mut Frame<B>, state: &mut State) {
+fn ui<B: Backend>(f: &mut Frame<B>, app: &mut App) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         // .margin(2)
@@ -131,14 +131,14 @@ fn ui<B: Backend>(f: &mut Frame<B>, state: &mut State) {
         .split(f.size());
 
     // We can now render the item list
-    ui_search(f, chunks[0], state);
-    ui_list(f, chunks[1], state);
-    ui_help(f, chunks[2], state);
+    ui_search(f, chunks[0], app);
+    ui_list(f, chunks[1], app);
+    ui_help(f, chunks[2], app);
 }
 
-fn ui_search<B: Backend>(f: &mut Frame<B>, rect: Rect, state: &mut State) {
-    let input = Paragraph::new(state.search.as_ref())
-        .style(match state.search_mode {
+fn ui_search<B: Backend>(f: &mut Frame<B>, rect: Rect, app: &mut App) {
+    let input = Paragraph::new(app.search.as_ref())
+        .style(match app.search_mode {
             _ => Style::default(),
             // true => Style::default().fg(Color::Yellow),
         })
@@ -146,15 +146,15 @@ fn ui_search<B: Backend>(f: &mut Frame<B>, rect: Rect, state: &mut State) {
     f.render_widget(input, rect);
     f.set_cursor(
         // Put cursor past the end of the input text
-        rect.x + state.search.width() as u16 + 1,
+        rect.x + app.search.width() as u16 + 1,
         // Move one line down, from the border to the input line
         rect.y + 1,
     )
 }
 
-fn ui_list<B: Backend>(f: &mut Frame<B>, rect: Rect, state: &mut State) {
+fn ui_list<B: Backend>(f: &mut Frame<B>, rect: Rect, app: &mut App) {
     // Iterate through all elements in the `items` app and append some debug text to it.
-    let items: Vec<ListItem> = state
+    let items: Vec<ListItem> = app
         .get_files()
         .iter()
         .map(|path| {
@@ -180,11 +180,11 @@ fn ui_list<B: Backend>(f: &mut Frame<B>, rect: Rect, state: &mut State) {
                 .add_modifier(Modifier::BOLD),
         )
         .highlight_symbol(">> ");
-    f.render_stateful_widget(items, rect, &mut state.list);
+    f.render_stateful_widget(items, rect, &mut app.list);
 }
 
-fn ui_help<B: Backend>(f: &mut Frame<B>, rect: Rect, state: &mut State) {
-    let (msg, style) = match state.search_mode {
+fn ui_help<B: Backend>(f: &mut Frame<B>, rect: Rect, app: &mut App) {
+    let (msg, style) = match app.search_mode {
         false => (
             vec![
                 Span::raw("Press "),
