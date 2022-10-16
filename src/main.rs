@@ -3,7 +3,7 @@ use crossterm::{
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
-use cs::{Event as CsEvent, App};
+use cs::{App, Event as CsEvent};
 use std::{
     error::Error,
     io,
@@ -157,17 +157,33 @@ fn ui_list<B: Backend>(f: &mut Frame<B>, rect: Rect, app: &mut App) {
     let items: Vec<ListItem> = app
         .get_files()
         .iter()
-        .map(|path| {
-            let lines = vec![Spans::from(
-                path.file_name().unwrap().to_str().unwrap().to_owned(),
-            )];
-            // for _ in 0..i.1 {
-            //     lines.push(Spans::from(Span::styled(
-            //         "Lorem ipsum dolor sit amet, consectetur adipiscing elit.",
-            //         Style::default().add_modifier(Modifier::ITALIC),
-            //     )));
-            // }
-            ListItem::new(lines).style(Style::default().fg(Color::White).bg(Color::Black))
+        .map(|node| {
+            let mut spans = vec![];
+            if node.highlights.is_empty() {
+                spans.push(Span::raw(node.name.clone()));
+            } else {
+                let mut last_index = 0;
+                let chars = node.name.chars().collect::<Vec<_>>();
+                for &i in node.highlights.iter() {
+                    if i > last_index {
+                        spans.push(Span::raw(
+                            chars[last_index..i].into_iter().collect::<String>(),
+                        ));
+                    }
+                    spans.push(Span::styled(
+                        chars[i..i + 1].into_iter().collect::<String>(),
+                        Style::default().fg(Color::LightRed).add_modifier(Modifier::BOLD),
+                    ));
+                    last_index = i + 1;
+                }
+                if last_index < chars.len() {
+                    spans.push(Span::raw(
+                        chars[last_index..].into_iter().collect::<String>(),
+                    ));
+                }
+            }
+            ListItem::new(Spans::from(spans))
+                .style(Style::default().fg(Color::White).bg(Color::Black))
         })
         .collect();
 

@@ -19,10 +19,16 @@ pub enum Sort {
     Ctime,
 }
 
+pub struct Node {
+    pub name: String,
+    pub highlights: Vec<usize>,
+    pub path: PathBuf,
+}
+
 pub struct App {
     dir: PathBuf,
     selected: usize,
-    files: Vec<PathBuf>,
+    files: Vec<Node>,
     sort: Option<Sort>,
     reverse: bool,
     pub list: ListState,
@@ -52,15 +58,23 @@ impl App {
             .read_dir()
             .unwrap()
             .filter_map(|entry| entry.ok())
-            .map(|entry| entry.path())
-            .filter(|path| is_match(path, &self.search))
+            .filter_map(|entry| {
+                let name = entry.file_name().to_str().unwrap().to_owned();
+                is_match(&name, &self.search).and_then(|highlights| {
+                    Some(Node {
+                        name,
+                        highlights,
+                        path: entry.path(),
+                    })
+                })
+            })
             .collect::<Vec<_>>();
         if let Some(sort) = &self.sort {
             sort_files(&mut files, sort);
         }
         self.files = files;
     }
-    pub fn get_files(&self) -> &[PathBuf] {
+    pub fn get_files(&self) -> &[Node] {
         &self.files
     }
     pub fn get_selected(&self) -> usize {
@@ -80,8 +94,8 @@ impl App {
             }
             Event::Right => {
                 if let Some(file) = self.files.get(self.selected) {
-                    if file.is_dir() {
-                        self.dir.push(file);
+                    if file.path.is_dir() {
+                        self.dir.push(&file.path);
                         self.selected = 0;
                         self.update_files();
                     }
@@ -107,27 +121,40 @@ impl App {
     }
 }
 
-fn is_match(file: &PathBuf, search: &str) -> bool {
-    file.file_name()
-        .and_then(|name| name.to_str())
-        .map(|name| name.to_lowercase().contains(search.to_lowercase().as_str()))
-        .unwrap_or(false)
+fn is_match(filename: &str, search: &str) -> Option<Vec<usize>> {
+    let mut ans = vec![];
+    let search_chars = search.to_lowercase().chars().collect::<Vec<_>>();
+    let mut j = 0;
+    for (i, c) in filename.to_lowercase().chars().enumerate() {
+        if j >= search_chars.len() {
+            break;
+        }
+        if c == search_chars[j] {
+            ans.push(i);
+            j += 1;
+        }
+    }
+    if j == search_chars.len() {
+        Some(ans)
+    } else {
+        None
+    }
 }
 
-fn sort_files(files: &mut Vec<PathBuf>, sort: &Sort) {
+fn sort_files(files: &mut Vec<Node>, sort: &Sort) {
     match sort {
-        Sort::Name => {
-            files.sort_by_key(|file| file.file_name().unwrap().to_str().unwrap().to_owned())
-        }
-        Sort::Size => files.sort_by_key(|file| file.metadata().map(|m| m.len()).unwrap_or(0)),
+        Sort::Name => files.sort_by_key(|file| file.name.clone()),
+        Sort::Size => files.sort_by_key(|file| file.path.metadata().map(|m| m.len()).unwrap_or(0)),
         Sort::Mtime => files.sort_by_key(|file| {
-            file.metadata()
+            file.path
+                .metadata()
                 .unwrap()
                 .modified()
                 .unwrap_or(std::time::SystemTime::UNIX_EPOCH)
         }),
         Sort::Ctime => files.sort_by_key(|file| {
-            file.metadata()
+            file.path
+                .metadata()
                 .unwrap()
                 .created()
                 .unwrap_or(std::time::SystemTime::UNIX_EPOCH)
