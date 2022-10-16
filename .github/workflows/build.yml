@@ -58,15 +58,15 @@ jobs:
           args: -q --best --lzma
           strip: false
 
-      - name: pack
-        run: |
-          mkdir -p release-${{ matrix.target }}
-          cd release-${{ matrix.target }}
-          tar -C ../target/${{ matrix.target }}/release -zcf cs-${{ matrix.target }}.tar.gz cs${{ matrix.file-ext }}
-          openssl dgst -sha256 -r cs-${{ matrix.target }}.tar.gz > cs-${{ matrix.target }}.sha256
+      # - name: pack
+      #   run: |
+      #     mkdir -p release-${{ matrix.target }}
+      #     cd release-${{ matrix.target }}
+      #     tar -C ../target/${{ matrix.target }}/release -zcf cs-${{ matrix.target }}.tar.gz cs${{ matrix.file-ext }}
+      #     openssl dgst -sha256 -r cs-${{ matrix.target }}.tar.gz > cs-${{ matrix.target }}.sha256
       
       - name: Upload artifact
         uses: actions/upload-artifact@v2
         with:
           name: ${{ matrix.target }}
-          path: release-${{ matrix.target }}/*
+          path: target/${{ matrix.target }}/release/cs${{ matrix.file-ext }}
